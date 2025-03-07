@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Box, Grid, ThemeProvider } from '@mui/material'
 import Header from '@/components/Header'
@@ -23,44 +23,44 @@ export default function ContractorDashboard() {
 	const [error, setError] = useState('')
 	const router = useRouter()
 
-	useEffect(() => {
+	// Memoized fetchData function to fetch all dashboard data
+	const fetchData = useCallback(async () => {
 		const token = localStorage.getItem('access_token')
 		if (!token) {
-			router.replace('/contractor/login') // Use replace instead of push
+			router.replace('/contractor/login')
 			return
 		}
 
-		const fetchData = async () => {
-			try {
-				const endpoints = ['profile/', 'boom-lifts/', 'builders/', 'sites/']
-				const responses = await Promise.all(
-					endpoints.map((endpoint) =>
-						fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contractor/${endpoint}`, {
-							headers: { Authorization: `Bearer ${token}` },
-						}).then((res) => {
-							if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`)
-							return res.json()
-						})
-					)
+		try {
+			const endpoints = ['profile/', 'boom-lifts/', 'builders/', 'sites/']
+			const responses = await Promise.all(
+				endpoints.map((endpoint) =>
+					fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contractor/${endpoint}`, {
+						headers: { Authorization: `Bearer ${token}` },
+					}).then((res) => {
+						if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`)
+						return res.json()
+					})
 				)
-				setData({
-					company: responses[0],
-					boomLifts: responses[1],
-					builders: responses[2],
-					sites: responses[3],
-				})
-			} catch (err) {
-				console.error('Error occurred:', err)
-				setError('Failed to load data')
-			}
+			)
+			setData({
+				company: responses[0],
+				boomLifts: responses[1],
+				builders: responses[2],
+				sites: responses[3],
+			})
+		} catch (err) {
+			console.error('Error occurred:', err)
+			setError('Failed to load data')
 		}
-
-		fetchData()
 	}, [router])
 
-	// Move the loading check after useEffect to ensure redirect happens first
+	useEffect(() => {
+		fetchData()
+	}, [fetchData])
+
 	if (!localStorage.getItem('access_token')) {
-		return null // Prevent rendering until redirect
+		return null
 	}
 
 	if (!data.company)
@@ -100,7 +100,10 @@ export default function ContractorDashboard() {
 							xs={12}
 							md={9}>
 							<BoomLiftMap boomLifts={data.boomLifts} />
-							<BoomLiftTable boomLifts={data.boomLifts} />
+							<BoomLiftTable
+								boomLifts={data.boomLifts}
+								onUploadSuccess={fetchData}
+							/>
 							<BuilderList builders={data.builders} />
 							<SiteList sites={data.sites} />
 						</Grid>
